@@ -22,10 +22,7 @@ return {
           { content_type = { type = "string" }, },
           { body = { type = "string" }, },
           { echo = { type = "boolean", required = true, default = false }, },
-          { trigger = typedefs.header_name },
-          { trigger_value = { type = "string" }, },
-          { avert = typedefs.header_name },
-          { avert_value = { type = "string" }, }
+          { trigger = typedefs.header_name }
         },
         custom_validator = function(config)
           if is_present(config.message)
