@@ -1,42 +1,50 @@
 local typedefs = require "kong.db.schema.typedefs"
 
 
-local PLUGIN_NAME = "custom-rt"
+local is_present = function(v)
+  return type(v) == "string" and #v > 0
+end
 
 
-local schema = {
-  name = PLUGIN_NAME,
+return {
+  name = "request-termination",
   fields = {
-    -- the 'fields' array is the top-level entry with fields defined by Kong
-    { consumer = typedefs.no_consumer },  -- this plugin cannot be configured on a consumer (typical for auth plugins)
     { protocols = typedefs.protocols_http },
     { config = {
-        -- The 'config' record is the custom part of the plugin schema
         type = "record",
         fields = {
-          -- a standard defined field (typedef), with some customizations
-          { request_header = typedefs.header_name {
-              required = true,
-              default = "Hello-World" } },
-          { response_header = typedefs.header_name {
-              required = true,
-              default = "Bye-World" } },
-          { ttl = { -- self defined field
-              type = "integer",
-              default = 600,
-              required = true,
-              gt = 0, }}, -- adding a constraint for the value
+          { status_code = {
+            type = "integer",
+            default = 503,
+            between = { 100, 599 },
+          }, },
+          { message = { type = "string" }, },
+          { content_type = { type = "string" }, },
+          { body = { type = "string" }, },
+          { echo = { type = "boolean", required = true, default = false }, },
+          { trigger = typedefs.header_name },
+          { trigger_value = { type = "string" }, },
+          { avert = typedefs.header_name },
+          { avert_value = { type = "string" }, }
         },
-        entity_checks = {
-          -- add some validation rules across fields
-          -- the following is silly because it is always true, since they are both required
-          { at_least_one_of = { "request_header", "response_header" }, },
-          -- We specify that both header-names cannot be the same
-          { distinct = { "request_header", "response_header"} },
-        },
+        custom_validator = function(config)
+          if is_present(config.message)
+          and(is_present(config.content_type)
+              or is_present(config.body)) then
+            return nil, "message cannot be used with content_type or body"
+          end
+          if is_present(config.content_type)
+          and not is_present(config.body) then
+            return nil, "content_type requires a body"
+          end
+          if config.echo and (
+            is_present(config.content_type) or
+            is_present(config.body)) then
+            return nil, "echo cannot be used with content_type and body"
+          end
+          return true
+        end,
       },
     },
   },
 }
-
-return schema
